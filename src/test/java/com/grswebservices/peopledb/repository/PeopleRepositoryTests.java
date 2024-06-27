@@ -33,7 +33,7 @@ public class PeopleRepositoryTests {
     public void canSaveTwoPeople() {
         PeopleRepository repo = new PeopleRepository(connection);
         Person john = new Person("John", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6")));
-        Person bobby = new Person("Bobby", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6")));
+        Person bobby = new Person("Bobby", "Smith", ZonedDateTime.of(1982, 11, 15, 15, 15, 0, 0, ZoneId.of("-6")));
         Person savedPerson1 = repo.save(john);
         Person savedPerson2 = repo.save(bobby);
         assertThat(savedPerson1.getId()).isNotEqualTo(savedPerson2.getId());
