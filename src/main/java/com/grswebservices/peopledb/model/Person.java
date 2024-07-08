@@ -38,6 +38,8 @@ public class Person {
         this.dob = dob;
     }
 
+    // note: ids keep incrementing, db keeps track of the last int, even if some records are deleted or not commited
+    // this is how h2 and probably a lot of other dbs happen to work
     public Long getId() {
         return id;
     }
@@ -46,5 +48,13 @@ public class Person {
         this.id = id;
     }
 
-
+    @Override
+    public String toString() {
+        return "Person{" +
+                "id=" + id +
+                ", firstName='" + firstName + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", dob=" + dob +
+                '}';
+    }
 }
