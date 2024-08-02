@@ -5,6 +5,7 @@ import com.grswebservices.peopledb.model.Person;
 
 import java.sql.*;
 import java.time.ZoneId;
+import java.util.Optional;
 
 public class PeopleRepository {
     public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
@@ -24,7 +25,7 @@ public class PeopleRepository {
             // prepared statements are pre-compiled, so they execute more quick;y than regular Statements. Prefer PreparedStatement.
             PreparedStatement ps = connection.prepareStatement(SAVE_PERSON_SQL, PreparedStatement.RETURN_GENERATED_KEYS);
             ps.setString(1, person.getFirstName());
-            ps.setString(2 ,person.getLastName());
+            ps.setString(2, person.getLastName());
             // standardize to GMT-0
             // dob returns a zonedDateTime and whatever the timezone was that we specified when we created it
             // then we're translating from that timezone to GMT-0 withZoneSameInstant method
@@ -44,5 +45,9 @@ public class PeopleRepository {
             throw new UnableToSaveException("Tried to save person: " + person);
         }
         return person;
+    }
+
+    public Person findById(Long id) {
+        return new Person("" ,"", null);
     }
 }
