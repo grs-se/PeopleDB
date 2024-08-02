@@ -21,7 +21,7 @@ public class PeopleRepositoryTests {
 
     @BeforeEach
     void setUp() throws SQLException {
-        connection = DriverManager.getConnection("jdbc:h2:C:\\Users\\georg\\DBeaverDB\\peopletestdb");
+        connection = DriverManager.getConnection("jdbc:h2:~\\Documents\\Database\\DBeaver\\peopletestdb".replace("~", System.getProperty("user.home")));
         // we can run tests without additional records showing up in database - or at least they are wiped out afterwards
         connection.setAutoCommit(false);
         repo = new PeopleRepository(connection);
@@ -55,7 +55,8 @@ public class PeopleRepositoryTests {
         // create a person, save them into the db, then turn around and try to find that person by their id
         Person savedPerson = repo.save(new Person("test", "jackson", ZonedDateTime.now()));
         Person foundPerson = repo.findById(savedPerson.getId());
-        assertThat(foundPerson.getId()).isEqualTo(savedPerson.getId());
+        // equals() method = all properties (id, name, dob, ...) of entities compared have to be equal
+        assertThat(foundPerson).isEqualTo(savedPerson);
     }
 
 }

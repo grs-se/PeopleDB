@@ -1,6 +1,9 @@
 package com.grswebservices.peopledb.model;
 
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 
 public class Person {
     private Long id;
@@ -56,5 +59,20 @@ public class Person {
                 ", lastName='" + lastName + '\'' +
                 ", dob=" + dob +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Person person = (Person) o;
+        return Objects.equals(id, person.id) && Objects.equals(firstName, person.firstName) && Objects.equals(lastName, person.lastName)
+                // normalizing the DateTime so comparing apples to apples
+                && Objects.equals(dob.withZoneSameInstant(ZoneId.of("+0")).truncatedTo(ChronoUnit.SECONDS), person.dob.withZoneSameInstant(ZoneId.of("+0")).truncatedTo(ChronoUnit.SECONDS));
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, firstName, lastName, dob);
     }
 }
