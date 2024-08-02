@@ -75,14 +75,36 @@ public class PeopleRepository {
         return Optional.ofNullable(person);
     }
 
-    public long count() throws SQLException {
+    public long count() {
         long count = 0;
-        String sql = "SELECT COUNT(*) AS CNT FROM PEOPLE";
-        PreparedStatement ps = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
-        ResultSet rs = ps.executeQuery();
-        while (rs.next()) {
-            count = rs.getInt("CNT");
+        try {
+            PreparedStatement ps = connection.prepareStatement("SELECT COUNT(*) FROM PEOPLE");
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return count;
+    }
+
+    public void delete(Person savedPerson) {
+        try {
+            PreparedStatement ps = connection.prepareStatement("DELETE FROM PEOPLE WHERE ID=?");
+            ps.setLong(1, savedPerson.getId());
+            int affectedRecordCount = ps.executeUpdate();
+            System.out.println(affectedRecordCount);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // var args are basically a shorthand for passing in an array: People...people = People[] people - except that we don't have to create an array in the code that calls this method
+    // so it makes it pretty easy to call this method and just pass in any arbitrary number of People objects
+    public void delete(Person...people) {
+        for (Person person: people) {
+            delete(person); // delegate to delete method - however there is a more efficient way. With this way we would be making separate and distinct updates to the database for each of the people that are passed in here. There is a more efficient way with one call to the database.
+        }
     }
 }

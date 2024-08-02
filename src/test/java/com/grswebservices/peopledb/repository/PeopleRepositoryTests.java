@@ -74,4 +74,22 @@ public class PeopleRepositoryTests {
         long endCount = repo.count();
         assertThat(endCount).isEqualTo(startCount + 2);
     }
+
+    @Test
+    public void canDelete() throws SQLException {
+        Person savedPerson = repo.save(new Person("John1", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
+        long startCount = repo.count();
+        repo.delete(savedPerson);
+        long endCount = repo.count();
+        assertThat(endCount).isEqualTo(startCount - 1);
+    }
+
+    @Test
+    public void canDeleteMultiplePeople() {
+        Person p1 = repo.save(new Person("John1", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
+        Person p2 = repo.save(new Person("John2", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
+
+        repo.delete(p1, p2);
+    }
+
 }
