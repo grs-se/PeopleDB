@@ -10,7 +10,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -88,8 +90,28 @@ public class PeopleRepositoryTests {
     public void canDeleteMultiplePeople() {
         Person p1 = repo.save(new Person("John1", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
         Person p2 = repo.save(new Person("John2", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
-
+        long startCount = repo.count();
         repo.delete(p1, p2);
+        long endCount = repo.count();
+        assertThat(endCount).isEqualTo(startCount - 2);
     }
 
+    @Test
+    public void experiment() {
+        Person p1 = new Person(10L, null, null, null);
+        Person p2 = new Person(20L, null, null, null);
+        Person p3 = new Person(30L, null, null, null);
+        Person p4 = new Person(40L, null, null, null);
+        Person p5 = new Person(50L, null, null, null);
+
+        // DELETE FROM PERSON WHERE ID IN (10,20,30,40,50);
+
+        Person[] people = Arrays.asList(p1, p2, p3, p4, p5).toArray(new Person[]{});
+
+        String ids = Arrays.stream(people)
+                .map(Person::getId) // convert stream of people into a stream of ids
+                .map(String::valueOf) // convert stream of Long ids into a stream of Text ids - equivalent to String.valueOf(20L)
+                .collect(Collectors.joining(","));// collect all string ids together and put a comma between them = comma delimited.
+        System.out.println(ids);
+    }
 }

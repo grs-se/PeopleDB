@@ -11,6 +11,19 @@ public class Person {
     private String lastName;
     private ZonedDateTime dob;
 
+    public Person(String firstName, String lastName, ZonedDateTime dob) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.dob = dob;
+    }
+
+    public Person(long id, String firstName, String lastName, ZonedDateTime dob) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.dob = dob;
+    }
+
     public String getFirstName() {
         return firstName;
     }
@@ -32,12 +45,6 @@ public class Person {
     }
 
     public void setDob(ZonedDateTime dob) {
-        this.dob = dob;
-    }
-
-    public Person(String firstName, String lastName, ZonedDateTime dob) {
-        this.firstName = firstName;
-        this.lastName = lastName;
         this.dob = dob;
     }
 

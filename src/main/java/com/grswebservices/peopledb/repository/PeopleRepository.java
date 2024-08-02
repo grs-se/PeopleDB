@@ -6,7 +6,9 @@ import com.grswebservices.peopledb.model.Person;
 import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class PeopleRepository {
     public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
@@ -93,7 +95,7 @@ public class PeopleRepository {
         try {
             PreparedStatement ps = connection.prepareStatement("DELETE FROM PEOPLE WHERE ID=?");
             ps.setLong(1, savedPerson.getId());
-            int affectedRecordCount = ps.executeUpdate();
+            int affectedRecordCount = ps.executeUpdate(); // can pass in sql directly into ps.executeUpdate() however it would not be as beneficial as defining our sql when we create our prepared statement because then that sql has the opportunity to be precompiled.
             System.out.println(affectedRecordCount);
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -103,8 +105,26 @@ public class PeopleRepository {
     // var args are basically a shorthand for passing in an array: People...people = People[] people - except that we don't have to create an array in the code that calls this method
     // so it makes it pretty easy to call this method and just pass in any arbitrary number of People objects
     public void delete(Person...people) {
-        for (Person person: people) {
-            delete(person); // delegate to delete method - however there is a more efficient way. With this way we would be making separate and distinct updates to the database for each of the people that are passed in here. There is a more efficient way with one call to the database.
+        // Option 1:
+//        for (Person person: people) {
+//            delete(person); // delegate to delete method - however there is a more efficient way. With this way we would be making separate and distinct updates to the database for each of the people that are passed in here. There is a more efficient way with one call to the database.
+//        }
+        // Option 2:
+        // advantage of this approach is that versus the for loop above when we were just delegating down to the original delete method, is that we are now able to have the db delete multiple records from the table simultaneously, which is much more efficient, especially if lots of records need to be updated.
+        // current version of H2 don't support using a preparedStatement for this operation
+        try {
+            Statement stmt = connection.createStatement();
+            String ids = Arrays.stream(people)
+                    .map(Person::getId) // convert stream of people into a stream of ids
+                    .map(String::valueOf) // convert stream of Long ids into a stream of Text ids - equivalent to String.valueOf(20L)
+                    .collect(Collectors.joining(","));// collect all string ids together and put a comma between them = comma delimited.
+            // "DELETE FROM PEOPLE WHERE ID IN (?,?,?,?)" - generate these in clause parameters dynamically // In clause limit for: Oracle = 1000, MSSQL = 2100, PostgreSQL = >32,767, H2 = ?
+            int affectedRecordCount = stmt.executeUpdate("DELETE FROM PEOPLE WHERE ID IN (:ids)".replace(":ids", ids));// (:id)= "sql named parameter" - although h2 doesn't support this so this is a fake or poor man's version
+            System.out.println(affectedRecordCount);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
+
     }
+
 }
