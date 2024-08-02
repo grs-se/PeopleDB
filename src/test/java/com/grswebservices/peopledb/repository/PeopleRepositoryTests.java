@@ -54,9 +54,15 @@ public class PeopleRepositoryTests {
     public void canFindPersonById() {
         // create a person, save them into the db, then turn around and try to find that person by their id
         Person savedPerson = repo.save(new Person("test", "jackson", ZonedDateTime.now()));
-        Person foundPerson = repo.findById(savedPerson.getId());
+        Person foundPerson = repo.findById(savedPerson.getId()).get();
         // equals() method = all properties (id, name, dob, ...) of entities compared have to be equal
         assertThat(foundPerson).isEqualTo(savedPerson);
     }
 
+    @Test
+    public void testPersonIdNotFound() {
+        // db doesn't generate negative Ids so we won't be able to find -1L
+         Optional<Person> foundPerson = repo.findById(-1L);
+         assertThat(foundPerson).isEmpty();
+    }
 }

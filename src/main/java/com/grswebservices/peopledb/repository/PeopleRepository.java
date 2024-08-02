@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public class PeopleRepository {
     public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB FROM PEOPLE WHERE ID=?";
     private final Connection connection;
 
     // can't create a PeopleRepository without passing in a connection
@@ -48,15 +49,16 @@ public class PeopleRepository {
         return person;
     }
 
-    public Person findById(Long id) {
+    public Optional<Person> findById(Long id) {
         Person person = null;
 
         try {
-            PreparedStatement ps = connection.prepareStatement("SELECT ID, FIRST_NAME, LAST_NAME, DOB FROM PEOPLE WHERE ID=?");
+            PreparedStatement ps = connection.prepareStatement(FIND_BY_ID_SQL);
             ps.setLong(1, id);
             ResultSet rs = ps.executeQuery();
             // telling rs to go to next line or next row
             while (rs.next()) {
+                // In professional environmental a framework may automatically take care of these String literals to make sure that they are always in sync with whatever is in the database
                 long personId = rs.getLong("ID");
                 String firstName = rs.getString("FIRST_NAME");
                 String lastName = rs.getString("LAST_NAME");
@@ -69,6 +71,7 @@ public class PeopleRepository {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        return person;
+        // if we didn't get any result from rs then the returned person will be null so Optional.of would blow up - hence has to be Optional.ofNullable
+        return Optional.ofNullable(person);
     }
 }
