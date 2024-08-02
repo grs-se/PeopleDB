@@ -65,4 +65,13 @@ public class PeopleRepositoryTests {
          Optional<Person> foundPerson = repo.findById(-1L);
          assertThat(foundPerson).isEmpty();
     }
+
+    @Test
+    public void canGetCount() throws SQLException {
+        long startCount = repo.count();
+        repo.save(new Person("John1", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
+        repo.save(new Person("John2", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
+        long endCount = repo.count();
+        assertThat(endCount).isEqualTo(startCount + 2);
+    }
 }

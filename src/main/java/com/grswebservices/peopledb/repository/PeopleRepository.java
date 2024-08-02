@@ -74,4 +74,15 @@ public class PeopleRepository {
         // if we didn't get any result from rs then the returned person will be null so Optional.of would blow up - hence has to be Optional.ofNullable
         return Optional.ofNullable(person);
     }
+
+    public long count() throws SQLException {
+        long count = 0;
+        String sql = "SELECT COUNT(*) AS CNT FROM PEOPLE";
+        PreparedStatement ps = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+        ResultSet rs = ps.executeQuery();
+        while (rs.next()) {
+            count = rs.getInt("CNT");
+        }
+        return count;
+    }
 }
