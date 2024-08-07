@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -16,6 +17,8 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+// Need the tests to fail before we implement anything, otherwise we can't be sure that we've actually implemented the needed functionality
+// main thing is make sure you have a failing test before you implement any code, then you run the test again, hopefully it passes, then you can mostly trust that you're probably on the right path.
 public class PeopleRepositoryTests {
 
     private Connection connection;
@@ -96,6 +99,26 @@ public class PeopleRepositoryTests {
         assertThat(endCount).isEqualTo(startCount - 2);
     }
 
+    @Test
+    public void canUpdate() {
+        // create a person, put that person into the db, retrieve that person, modify that person object, then create a new update method passing in that new modified person into the db, then retrieve that person by their id again from the db, then we will have the 2 person objects in our code, and then we can aseert that whatever field we changed is actually differnet between those two people
+        Person savedPerson = repo.save(new Person("John1", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6"))));
+
+        Person p1 = repo.findById(savedPerson.getId()).get();
+
+        savedPerson.setSalary(new BigDecimal("73000.28"));
+        repo.update(savedPerson);
+
+        Person p2 = repo.findById(savedPerson.getId()).get();
+
+        assertThat(p2.getSalary()).isNotEqualTo(p1.getSalary());
+    }
+
+
+    ////////////////////////////////////////////
+    // EXPERIMENTS
+    ////////////////////////////////////////////
+    // a good technique to try something out quickly - almost equivalent to a implementing a psvm method, however in frameworks the psvm approach doesn't really apply anymore so you need a place to try things out
     @Test
     public void experiment() {
         Person p1 = new Person(10L, null, null, null);

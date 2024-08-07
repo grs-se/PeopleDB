@@ -1,5 +1,6 @@
 package com.grswebservices.peopledb.model;
 
+import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -10,15 +11,19 @@ public class Person {
     private String firstName;
     private String lastName;
     private ZonedDateTime dob;
+    private BigDecimal salary = new BigDecimal("0");
 
-    public Person(String firstName, String lastName, ZonedDateTime dob) {
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.dob = dob;
+    public Person(long id, String firstName, String lastName, ZonedDateTime dob, BigDecimal salary) {
+        this(id, firstName, lastName, dob);
+        this.salary = salary;
     }
 
     public Person(long id, String firstName, String lastName, ZonedDateTime dob) {
+        this(firstName, lastName, dob);
         this.id = id;
+    }
+
+    public Person(String firstName, String lastName, ZonedDateTime dob) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.dob = dob;
@@ -81,5 +86,13 @@ public class Person {
     @Override
     public int hashCode() {
         return Objects.hash(id, firstName, lastName, dob);
+    }
+
+    public BigDecimal getSalary() {
+        return salary;
+    }
+
+    public void setSalary(BigDecimal salary) {
+        this.salary = salary;
     }
 }

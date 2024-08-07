@@ -3,16 +3,20 @@ package com.grswebservices.peopledb.repository;
 import com.grswebservices.peopledb.exception.UnableToSaveException;
 import com.grswebservices.peopledb.model.Person;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class PeopleRepository {
     public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
-    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB FROM PEOPLE WHERE ID=?";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
+    public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
     private final Connection connection;
 
     // can't create a PeopleRepository without passing in a connection
@@ -34,7 +38,7 @@ public class PeopleRepository {
             // dob returns a zonedDateTime and whatever the timezone was that we specified when we created it
             // then we're translating from that timezone to GMT-0 withZoneSameInstant method
             // then translating that zonedDateTime into a localDateTime which we can then pass into the Timestamp.valueOf() method
-            ps.setTimestamp(3, Timestamp.valueOf(person.getDob().withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime()));
+            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
             int recordsAffected = ps.executeUpdate();
             // think of ResultSet as a 2-dimensional array, rows and columns
             ResultSet rs = ps.getGeneratedKeys();
@@ -60,21 +64,39 @@ public class PeopleRepository {
             ResultSet rs = ps.executeQuery();
             // telling rs to go to next line or next row
             while (rs.next()) {
-                // In professional environmental a framework may automatically take care of these String literals to make sure that they are always in sync with whatever is in the database
-                long personId = rs.getLong("ID");
-                String firstName = rs.getString("FIRST_NAME");
-                String lastName = rs.getString("LAST_NAME");
-                // When we create an instance of Person we can specify the TimeZone for DOB and it can be any TZ in the world, but when we get them from the DB they are all going to be normalized to a TZ of GMT+0
-                // I can't know what TZ this person was born, I just know that the moment in time in the world where they were born is whatever it is relative to GMT+0
-                ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
-                person = new Person(firstName, lastName, dob);
-                person.setId(personId);
+                person = extractPersonFromResultSet(rs);
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
         // if we didn't get any result from rs then the returned person will be null so Optional.of would blow up - hence has to be Optional.ofNullable
         return Optional.ofNullable(person);
+    }
+
+    private List<Person> findAll() {
+        List<Person> people = new ArrayList<>();
+        try {
+            PreparedStatement ps = connection.prepareStatement(FIND_ALL_SQL);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                people.add(extractPersonFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return people;
+    }
+
+    private static Person extractPersonFromResultSet(ResultSet rs) throws SQLException {
+        // In professional environmental a framework may automatically take care of these String literals to make sure that they are always in sync with whatever is in the database
+        long personId = rs.getLong("ID");
+        String firstName = rs.getString("FIRST_NAME");
+        String lastName = rs.getString("LAST_NAME");
+        // When we create an instance of Person we can specify the TimeZone for DOB and it can be any TZ in the world, but when we get them from the DB they are all going to be normalized to a TZ of GMT+0
+        // I can't know what TZ this person was born, I just know that the moment in time in the world where they were born is whatever it is relative to GMT+0
+        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
+        BigDecimal salary = rs.getBigDecimal("SALARY");
+        return new Person(personId, firstName, lastName, dob, salary);
     }
 
     public long count() {
@@ -127,4 +149,21 @@ public class PeopleRepository {
 
     }
 
+    public void update(Person person) {
+        try {
+            PreparedStatement ps = connection.prepareStatement("UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=?, SALARY=? WHERE ID=?");
+            ps.setString(1, person.getFirstName());
+            ps.setString(2, person.getLastName());
+            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
+            ps.setBigDecimal(4, person.getSalary());
+            ps.setLong(5, person.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
+        return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());
+    }
 }
