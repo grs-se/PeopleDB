@@ -198,3 +198,99 @@ public class PeopleRepository extends CRUDRepository<Person> {
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
     }
 ```
+- the whole point of OOP is to model the real world, not to model computer science concepts. So naming conventions prefer "entities" (plural is enough) rather than "entitiesList"
+- TDD: when refactoring not necessary to do TDD as you write tests for new fucntionality. Refactoring is technically not new fucntionality. Refactoring is really just reshuffling existing functionality in some other way. So as long as we're not introducing any new functionality we don't need to start with a new test. And in fact, because I have a suite of tests for the existing functionality, tjhat's what's giving me guard rails to feel safe about doing this level of surgery pm this class - moving a little bit at a time, make a few changes just to make that new method work, and then use tests to confirm whether i broke any existing functiaopnlity, and if- i had broke existing functionality that would be called regression, so this is called regression testing . I dont try to reimplenment every single class all in one foul swoop.
+
+---
+
+- Look how much cleaner this now is. This is where we get into the 'craftsmanship' of writing code. 
+- Generics, abstract classes, super classes, sub classes, cleaning up the messiness of try catch, and now it's so much more concise, and now moore importantly we've set ourselves up to create another repository class much more easily and quickly than we had before, just focussing ont he most important bits, and now all the other scaffolding will already be taken care of/
+- This is one of the types of exercises where you can start to really get an appreciation for OOP, that's not to say that you couldn't do similarly nice clean up activities with another programming paradigm, but this is some of how you can do this with OOP. 
+```java
+package com.grswebservices.peopledb.repository;
+
+import com.grswebservices.peopledb.model.Person;
+
+import java.math.BigDecimal;
+import java.sql.*;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
+public class PeopleRepository extends CRUDRepository<Person> {
+    public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
+    public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
+    public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
+    public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
+    public static final String DELETE_IN_SQL = "DELETE FROM PEOPLE WHERE ID IN (:ids)";
+    public static final String UPDATE_SQL = "UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=?, SALARY=? WHERE ID=?";
+
+    public PeopleRepository(Connection connection) {
+        super(connection);
+    }
+
+    @Override
+    protected String getSaveSql() {
+        return SAVE_PERSON_SQL;
+    }
+
+    @Override
+    void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+    }
+
+    @Override
+    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
+        long personId = rs.getLong("ID");
+        String firstName = rs.getString("FIRST_NAME");
+        String lastName = rs.getString("LAST_NAME");
+        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
+        BigDecimal salary = rs.getBigDecimal("SALARY");
+        return new Person(personId, firstName, lastName, dob, salary);
+    }
+
+    @Override
+    void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+        ps.setBigDecimal(4, entity.getSalary());
+    }
+
+    @Override
+    protected String getFindByIdSql() {
+        return FIND_BY_ID_SQL;
+    }
+
+    @Override
+    protected String getFindAllSql() {
+        return FIND_ALL_SQL;
+    }
+
+    @Override
+    protected String getCountSql() {
+        return SELECT_COUNT_SQL;
+    }
+
+    @Override
+    protected String getDeleteSql() {
+        return DELETE_SQL;
+    }
+
+    @Override
+    protected String getDeleteInSql() {
+        return DELETE_IN_SQL;
+    }
+
+    @Override
+    protected String getUpdateSql() {
+        return UPDATE_SQL;
+    }
+
+    private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
+        return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());
+    }
+}
+```
