@@ -1,3 +1,6 @@
+[## DATABASES
+]()
+```java
 package com.grswebservices.peopledb.repository;
 
 import com.grswebservices.peopledb.exception.UnableToSaveException;
@@ -13,26 +16,46 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class PeopleRepository extends CRUDRepository<Person> {
+public class PeopleRepository {
     public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
     public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
     public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
+    private final Connection connection;
 
+    // can't create a PeopleRepository without passing in a connection
     public PeopleRepository(Connection connection) {
-        super(connection); // because now the PeopleRepo is extending the CRUDRepo, this classes constructor has to call the super constructor
-        // this.connection = connection; // PeopleRepo now inheriting connection from CRUDRepo
+        this.connection = connection;
     }
 
-    @Override
-    String getSavedSql() {
-        return SAVE_PERSON_SQL;
-    }
-
-    @Override
-    void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
-        ps.setString(1, entity.getFirstName());
-        ps.setString(2, entity.getLastName());
-        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+    // prepareStatement gives us more elegant way of passing values in rather than createStatement
+    public Person save(Person person) throws UnableToSaveException {
+        try {
+            // SQL injection - not possible with prepareStatement, however is possible if we had used string concatenation
+            // in a prepare statement every parameter we are expecting in is constrained to its little bit of data
+            // the rule to follow when writing JDBC code is, if you've ot parameters that you need to bind to outside data: use a preparedStatement as that will save you from this particular level of SQL injection
+            // prepared statements are pre-compiled, so they execute more quick;y than regular Statements. Prefer PreparedStatement.
+            PreparedStatement ps = connection.prepareStatement(SAVE_PERSON_SQL, PreparedStatement.RETURN_GENERATED_KEYS);
+            ps.setString(1, person.getFirstName());
+            ps.setString(2, person.getLastName());
+            // standardize to GMT-0
+            // dob returns a zonedDateTime and whatever the timezone was that we specified when we created it
+            // then we're translating from that timezone to GMT-0 withZoneSameInstant method
+            // then translating that zonedDateTime into a localDateTime which we can then pass into the Timestamp.valueOf() method
+            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
+            int recordsAffected = ps.executeUpdate();
+            // think of ResultSet as a 2-dimensional array, rows and columns
+            ResultSet rs = ps.getGeneratedKeys();
+            while (rs.next()) {
+                long id = rs.getLong(1);
+                person.setId(id);
+                System.out.println(person);
+            }
+            System.out.printf("Records affected: %d%n", recordsAffected);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new UnableToSaveException("Tried to save person: " + person);
+        }
+        return person;
     }
 
     public Optional<Person> findById(Long id) {
@@ -147,3 +170,31 @@ public class PeopleRepository extends CRUDRepository<Person> {
         return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());
     }
 }
+```
+
+
+- this is all it takes now to generate a save method - a method that generates the SQL and a method that does the mapping.
+- all tests still pass
+- a resueable generic CRUD repository class that will help us to create additional repositories 
+
+```java
+public class PeopleRepository extends CRUDRepository<Person> {
+    public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
+
+    public PeopleRepository(Connection connection) {
+        super(connection); // because now the PeopleRepo is extending the CRUDRepo, this classes constructor has to call the super constructor
+        // this.connection = connection; // PeopleRepo now inheriting connection from CRUDRepo
+    }
+
+    @Override
+    String getSavedSql() {
+        return SAVE_PERSON_SQL;
+    }
+
+    @Override
+    void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+    }
+```

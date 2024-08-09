@@ -6,7 +6,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
-public class Person {
+public class Person implements Entity {
     private Long id;
     private String firstName;
     private String lastName;
@@ -55,10 +55,12 @@ public class Person {
 
     // note: ids keep incrementing, db keeps track of the last int, even if some records are deleted or not commited
     // this is how h2 and probably a lot of other dbs happen to work
+    @Override
     public Long getId() {
         return id;
     }
 
+    @Override
     public void setId(Long id) {
         this.id = id;
     }
