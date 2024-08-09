@@ -909,3 +909,9 @@ abstract public class CRUDRepository<T extends Entity> {
 }
 
 ```
+
+---
+
+### CRUD Repository: Custom ID Annotation
+- I want to replace the wya that I am getting this id, currently i am just calling entity.getId(), that works the way you know it would, but i'd rather have some code that would dig into this entity using Relection API, and find the field that is annotated with the new Id annotation, and if it finds one, then this code shoudl get the value that is on that field and return that value. 
+- so we're going to write another annotation finding method that can do the equivalent of what entity.getId() is doing but it will do it via annotation and therefore we will no longer require this class to implement that interface.

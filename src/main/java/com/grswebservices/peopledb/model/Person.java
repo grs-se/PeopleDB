@@ -1,5 +1,7 @@
 package com.grswebservices.peopledb.model;
 
+import com.grswebservices.peopledb.annotation.Id;
+
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -7,7 +9,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 public class Person implements Entity {
+    @Id
     private Long id;
+
     private String firstName;
     private String lastName;
     private ZonedDateTime dob;
