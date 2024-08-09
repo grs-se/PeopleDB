@@ -1,5 +1,6 @@
 package com.grswebservices.peopledb.repository;
 
+import com.grswebservices.peopledb.annotation.SQL;
 import com.grswebservices.peopledb.exception.UnableToSaveException;
 import com.grswebservices.peopledb.model.Entity;
 
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 abstract public class CRUDRepository<T extends Entity> {
@@ -21,7 +23,7 @@ abstract public class CRUDRepository<T extends Entity> {
 
     public T save(T entity) {
         try {
-            PreparedStatement ps = connection.prepareStatement(getSaveSql(), PreparedStatement.RETURN_GENERATED_KEYS);
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation("mapForSave", this::getSaveSql), PreparedStatement.RETURN_GENERATED_KEYS);
             mapForSave(entity, ps);
             int recordsAffected = ps.executeUpdate();
             ResultSet rs = ps.getGeneratedKeys();
@@ -102,21 +104,14 @@ abstract public class CRUDRepository<T extends Entity> {
 
     // var args are basically a shorthand for passing in an array: People...entities = People[] entities - except that we don't have to create an array in the code that calls this method
     // so it makes it pretty easy to call this method and just pass in any arbitrary number of People objects
-    public void delete(T...entities) {
-        // Option 1:
-        // for (Person person: entities) {
-            // delete(person); // delegate to delete method - however there is a more efficient way. With this way we would be making separate and distinct updates to the database for each of the entities that are passed in here. There is a more efficient way with one call to the database.
-        // }
-        // Option 2:
-        // advantage of this approach is that versus the for loop above when we were just delegating down to the original delete method, is that we are now able to have the db delete multiple records from the table simultaneously, which is much more efficient, especially if lots of records need to be updated.
-        // current version of H2 don't support using a preparedStatement for this operation
+    @SafeVarargs
+    public final void delete(T... entities) {
         try {
             Statement stmt = connection.createStatement();
             String ids = Arrays.stream(entities)
                     .map(T::getId) // convert stream of entities into a stream of ids
                     .map(String::valueOf) // convert stream of Long ids into a stream of Text ids - equivalent to String.valueOf(20L)
                     .collect(Collectors.joining(","));// collect all string ids together and put a comma between them = comma delimited.
-            // "DELETE FROM PEOPLE WHERE ID IN (?,?,?,?)" - generate these in clause parameters dynamically // In clause limit for: Oracle = 1000, MSSQL = 2100, PostgreSQL = >32,767, H2 = ?
             int affectedRecordCount = stmt.executeUpdate(getDeleteInSql().replace(":ids", ids));// (:id)= "sql named parameter" - although h2 doesn't support this so this is a fake or poor man's version
             System.out.println(affectedRecordCount);
         } catch (SQLException e) {
@@ -126,7 +121,7 @@ abstract public class CRUDRepository<T extends Entity> {
 
     public void update(T entity) {
         try {
-            PreparedStatement ps = connection.prepareStatement(getUpdateSql());
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation("mapForUpdate", this::getUpdateSql));
             mapForUpdate(entity, ps);
             ps.setLong(5, entity.getId());
             ps.executeUpdate();
@@ -135,9 +130,15 @@ abstract public class CRUDRepository<T extends Entity> {
         }
     }
 
-    // abstract methods: subclasses must implement that method. Not implemented on the defining class.
+    private String getSqlByAnnotation(String methodName, Supplier<String> sqlGetter) {
+        return Arrays.stream(this.getClass().getDeclaredMethods()) // a stream of methods
+                .filter(m -> methodName.contentEquals(m.getName())) // a stream of filtered methods
+                .map(m -> m.getAnnotation(SQL.class)) // a stream of SQL annotations
+                .map(SQL::value)
+                .findFirst().orElseGet(sqlGetter);
+    }
 
-    protected abstract String getSaveSql();
+    protected String getSaveSql() {return "";}
 
     protected abstract String getCountSql();
 
@@ -155,7 +156,7 @@ abstract public class CRUDRepository<T extends Entity> {
      */
     protected abstract String getDeleteInSql();
 
-    protected abstract String getUpdateSql();
+    protected String getUpdateSql() {return "";};
 
     abstract T extractEntityFromResultSet(ResultSet rs) throws SQLException;
 

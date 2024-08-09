@@ -464,3 +464,88 @@ abstract public class CRUDRepository<T extends Entity> {
 
 
 ```
+
+###CRUD Repository: Implementing a Custom Anootation
+- in order to convey the to the CRUD repository the SQL statements that we need for the various functions we had to pepper this class with these extra getter methods here, but there are frameworks that allow us to do this in a better way
+- give our CRUD repo the ability to get these sql queries without having to implement these abstract methods, and in doing so we will learn about the Java Reflection API. 
+- the reflection API is pretty much only used by frameworks, but as we are creating this CRUD repository functionality we are basically creating a poor man's framework.
+- modern frameworks use annotations: so we can create our own annotation, and in that annotation we can specify the sql that we want, and then our crud could dynamically at runtime learn the sql that it needs from the annotation and thereby we would no longer need these methods. 
+- So we will create our own custom annotations, then use the Reflection API to find those annotations and read information that's in them, so that we don't need to implement those methods here. 
+- do this we basicalyl create an interface, java basically uses the interface apparatus to implement annotations.
+- we will want these annotations to be visible to our application code while we're running it. The easiest way to do that is to label this annotation with another annotation called 'Retention'
+- and then inorder to be allowed to embed that SQL inside our usage of this annotation we will have to define an attribute insude of this annotation, without an attribute label @SQL(value =""asdasd")
+- annotations are basically interfaces, and on interfaces you declare methods
+- So if I declare a method on my interface named 'value' then that attribute will become basically the default attribute of the annotation such that I don't havfe to explicitly name that attribute value. 
+- What does the Reflections API really do? The Reflections API allows us to write Java code that allows us to analyse our Java code.
+- So we want to write some code in the CRUD Repository that is capable of seeing the Java code in the People Repository, and what we want it to do is to find a method called MapForSave and then we want this code to see if there is an @SQL annotation on this method map for save, and if there is grab this SQL string inside it, and use that SQL string. 
+- So the Java Refelctions API allows us to analyse our own code in real time at runtime. 
+- It's very meta. 
+- So the way that we do that is to reference this class at runtime to get into the Reflections API. 
+- So anytime you want to access a class of an object - this code will be running inside of an object - and so we can refer to the object using the 'this' keyword, and then if we want to get acess to the class that this objcet is part of then we can call 'this.getClass'
+- so this getClass() method actually retruns something called a class (public final Class<?> getClass()) - so this is a Java representation of a class file. And so you can think o fit as the source code that we're looking at. In fact you can very much think of it as that, that's what it's essentially going to model. 
+- And so when yout hink abotu what comprise a class, classes can have a name, fields, methods, so you can actually access all those same concepts through this 'Class' class. 
+- We want to find a method on our class called MapForSave, because that method is going to have our new annotation on it. 
+- And so there are methods on the Class class for finding methods: getMethod(), getMethods(), getDeclaredMethods()
+- getDeclaredMethods returns an array of method objects. So we're going to use the streams api to convert an array of Objects into a stream of objects.
+- whenever we talk about converting in the streams api we#re really saying use the map function.
+- getAnnotation() takes a class as an input: enums, records, classes, itnerfaces are all classes
+- So if this calss which will end up actually not being the CRUD repo but in our casr the PeopleRepo which is a subclass of the CRUD repo - has a method on it called MapForSave, and if that method has an annotation on it called 'SQL' and if that annotation has a value, get that! And then we just want to return that. But the findFirst returns an Optional, so in the case that findFirst doesnt return the annotation, we use orElse to fallback to the getSaveSql(), and that's actually fairly eloquent.
+
+```java
+// CRUD Repository
+private String getSaveSqlByAnnotation() {
+   return Arrays.stream(this.getClass().getDeclaredMethods()) // a stream of methods
+           .filter(m -> "mapForSave".contentEquals(m.getName())) // a stream of filtered methods
+           .map(m -> m.getAnnotation(SQL.class)) // a stream of SQL annotations
+           .map(SQL::value)
+           .findFirst().orElse(getSaveSql());
+
+}
+
+// PeopleRepository
+@Override
+@SQL(SAVE_PERSON_SQL)
+void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+    ps.setString(1, entity.getFirstName());
+    ps.setString(2, entity.getLastName());
+    ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+}
+
+
+//    @Override
+//    protected String getSaveSql() {
+//        return SAVE_PERSON_SQL;
+//    }
+```
+
+- and now we don't need the getSaveSql() method to be abstract anymore, I don't want to force our subclasses to implement this method any more, so remove the abstract keyword, and that means I have to provide an implementation now.
+- orElseGet takes a supplier so we can pass in a method reference to the getSaveSQL method
+
+```java
+    private String getSqlByAnnotation(String methodName, Supplier<String> sqlGetter) {
+       return Arrays.stream(this.getClass().getDeclaredMethods()) // a stream of methods
+               .filter(m -> methodName.contentEquals(m.getName())) // a stream of filtered methods
+               .map(m -> m.getAnnotation(SQL.class)) // a stream of SQL annotations
+               .map(SQL::value)
+               .findFirst().orElseGet(sqlGetter);
+    }
+
+    public T save(T entity) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation("mapForSave", this::getSaveSql), PreparedStatement.RETURN_GENERATED_KEYS);
+            mapForSave(entity, ps);
+            int recordsAffected = ps.executeUpdate();
+            ResultSet rs = ps.getGeneratedKeys();
+            while (rs.next()) {
+                long id = rs.getLong(1);
+                entity.setId(id);
+                System.out.println(entity);
+            }
+            System.out.printf("Records affected: %d%n", recordsAffected);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new UnableToSaveException("Tried to save entity: " + entity);
+        }
+        return entity;
+    }
+```

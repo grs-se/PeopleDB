@@ -1,5 +1,6 @@
 package com.grswebservices.peopledb.repository;
 
+import com.grswebservices.peopledb.annotation.SQL;
 import com.grswebservices.peopledb.model.Person;
 
 import java.math.BigDecimal;
@@ -21,15 +22,20 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    protected String getSaveSql() {
-        return SAVE_PERSON_SQL;
-    }
-
-    @Override
+    @SQL(SAVE_PERSON_SQL)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+    }
+
+    @Override
+    @SQL(UPDATE_SQL)
+    void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+        ps.setBigDecimal(4, entity.getSalary());
     }
 
     @Override
@@ -40,14 +46,6 @@ public class PeopleRepository extends CRUDRepository<Person> {
         ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
         BigDecimal salary = rs.getBigDecimal("SALARY");
         return new Person(personId, firstName, lastName, dob, salary);
-    }
-
-    @Override
-    void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
-        ps.setString(1, entity.getFirstName());
-        ps.setString(2, entity.getLastName());
-        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
-        ps.setBigDecimal(4, entity.getSalary());
     }
 
     @Override
@@ -73,11 +71,6 @@ public class PeopleRepository extends CRUDRepository<Person> {
     @Override
     protected String getDeleteInSql() {
         return DELETE_IN_SQL;
-    }
-
-    @Override
-    protected String getUpdateSql() {
-        return UPDATE_SQL;
     }
 
     private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
