@@ -1,6 +1,8 @@
 package com.grswebservices.peopledb.repository;
 
+import com.grswebservices.peopledb.annotation.MultiSQL;
 import com.grswebservices.peopledb.annotation.SQL;
+import com.grswebservices.peopledb.model.CrudOperation;
 import com.grswebservices.peopledb.model.Person;
 
 import java.math.BigDecimal;
@@ -22,7 +24,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    @SQL(SAVE_PERSON_SQL)
+    @SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -30,7 +32,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    @SQL(UPDATE_SQL)
+    @SQL(value = UPDATE_SQL, operationType = CrudOperation.UPDATE)
     void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -39,6 +41,11 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
+    @SQL(value = FIND_BY_ID_SQL, operationType = CrudOperation.FIND_BY_ID)
+    @SQL(value = FIND_ALL_SQL, operationType = CrudOperation.FIND_ALL)
+    @SQL(value = SELECT_COUNT_SQL, operationType = CrudOperation.COUNT)
+    @SQL(value = DELETE_SQL, operationType = CrudOperation.DELETE_ONE)
+    @SQL(value = DELETE_IN_SQL, operationType = CrudOperation.DELETE_MANY)
     Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
         long personId = rs.getLong("ID");
         String firstName = rs.getString("FIRST_NAME");
@@ -46,31 +53,6 @@ public class PeopleRepository extends CRUDRepository<Person> {
         ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
         BigDecimal salary = rs.getBigDecimal("SALARY");
         return new Person(personId, firstName, lastName, dob, salary);
-    }
-
-    @Override
-    protected String getFindByIdSql() {
-        return FIND_BY_ID_SQL;
-    }
-
-    @Override
-    protected String getFindAllSql() {
-        return FIND_ALL_SQL;
-    }
-
-    @Override
-    protected String getCountSql() {
-        return SELECT_COUNT_SQL;
-    }
-
-    @Override
-    protected String getDeleteSql() {
-        return DELETE_SQL;
-    }
-
-    @Override
-    protected String getDeleteInSql() {
-        return DELETE_IN_SQL;
     }
 
     private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {

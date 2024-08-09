@@ -549,3 +549,363 @@ void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
         return entity;
     }
 ```
+- instead of searching for the method by methodName we could search by CRUD operation. So we could introduce another attribute on the @SQL annotation that lets us specify what the operation is: saving, updating, findAll
+- you could even put that annotation up top on the class itself. As long as the annotation can be found according to the operation that you're trying to do everything is good.
+- why using the orElseGet() with this method reference is better than just calling the getter method directly? because this::getUpdateSql is never even going to get evaluated unless it's actually needed, on the pther hand if this was actually not a method reference, that method would get called whether or not we needed it's value, so by using a method reference we are able to do what is called lazy loading, where you don;t actually do the processing required to make that call unless you actually need to. So we're just passing around a reference to the method vs calling the method. So that's whyt hat is of value.
+- @Repeatable - we have to provide a reference to a container annotation that will hold our SQL annotation.
+- if you want to be able to use the same annotation multiple times on a method then those annotations need to be wrapped inside of a container or parent annotation. We don't actually need to wrap them ourselves, Java will do that for us. But we still have to define a container annotation because whenw e use the Reflection API to find whatver methods we're interested in, the existing APIs won't let us say find all methods that have multiple @SQL annotations on them, so instead we have to say find all methods that have the container annotation, and then ocne we find that, then we can dig into that and get all the SQL annotations. But for the other methods that just ghave 1 SQL annotation those annotation will work just the same as it was.
+
+```java
+package com.grswebservices.peopledb.annotation;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+/**
+ * Specify that this annotation can contain multiple @SQL annotation
+ * by defining a value method that returns an array of SQL annotations.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+public @interface MultiSQL {
+    SQL[] value();
+}
+
+```
+
+```java
+package com.grswebservices.peopledb.annotation;
+
+import com.grswebservices.peopledb.model.CrudOperation;
+
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Repeatable(MultiSQL.class) // this annotation is repeatable
+public @interface SQL {
+    String value();
+    CrudOperation operationType();
+}
+
+```
+- now in addition we need to be able to search for SQL annotations that are found embedded inside our MultiSql annotation
+- keep in mind that although we didn't explicity wrap these two SQL annotations inside a MultiSQL annotation Java will do that for us, by virtue of the fact that we have made these repeatable and we have multiple ones on this method
+- so when we use the Reflection API to find these on this particular method, they won't show up on this method, isntesad this method will appear to only have one anootation on it, which will be the MultiSQL annotation, and then we will have to grab that multiSQL annotation and dig into it to get these out.
+  - So it will look like this when we're programmatically looking for the SQL annotations
+
+
+```java
+    @Override
+    @MultiSQL(
+        @SQL(value = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?", operationType = CrudOperation.FIND_BY_ID)
+        @SQL(value = FIND_BY_ID_SQL, operationType = CrudOperation.FIND_BY_ID)
+    )
+    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
+        long personId = rs.getLong("ID");
+        String firstName = rs.getString("FIRST_NAME");
+        String lastName = rs.getString("LAST_NAME");
+        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
+        BigDecimal salary = rs.getBigDecimal("SALARY");
+        return new Person(personId, firstName, lastName, dob, salary);
+    }
+```
+
+- So in addition to our existing code that says go find all the methods that have the SQL annotation on it, we also have to have code that says go fidn al the methods that have the multiSQL annotation on it, and then if and when we find that then we have to access that guys value to get at this array of SQL annotations, and then from that point it will be the same processing.
+- But we don't explicitly need to wrap thos code inside a MultiSQL annotation.
+- Stream.concat() concanetantes two streams together.
+- And now the rest of this processing can take place on both of these streams.
+
+```java
+    private String getSqlByAnnotation(CrudOperation operationType, Supplier<String> sqlGetter) {
+    Stream<SQL> multiSqlStream = Arrays.stream(this.getClass().getDeclaredMethods())
+            .filter(m -> m.isAnnotationPresent(MultiSQL.class))
+            .map(m -> m.getAnnotation(MultiSQL.class))
+            .flatMap(msql -> Arrays.stream(msql.value()));
+
+    Stream<SQL> sqlStream = Arrays.stream(this.getClass().getDeclaredMethods())
+            .filter(m -> m.isAnnotationPresent(SQL.class))
+            .map(m -> m.getAnnotation(SQL.class));
+
+    return Stream.concat(multiSqlStream, sqlStream)
+            .filter(a -> a.operationType().equals(operationType))
+            .map(SQL::value)
+            .findFirst().orElseGet(sqlGetter);
+}
+```
+
+- And now we can get rid of tall of these methods:
+
+```java
+//@Override
+//protected String getFindByIdSql() {
+//    return FIND_BY_ID_SQL;
+//}
+//
+//@Override
+//protected String getFindAllSql() {
+//    return FIND_ALL_SQL;
+//}
+//
+//@Override
+//protected String getCountSql() {
+//    return SELECT_COUNT_SQL;
+//}
+//
+//@Override
+//protected String getDeleteSql() {
+//    return DELETE_SQL;
+//}
+//
+//@Override
+//protected String getDeleteInSql() {
+//    return DELETE_IN_SQL;
+//}
+```
+- Satisfying to refactor and delete code, helps to feel on right path and doing a good job.
+- Now the CRUD repositry is even bigger than this class was, however, where you'll start to see the value is when we create another repository.
+- the CRUD repository from which we will now extend will now do most of the heavy lifting for us. And so now we will msotly just have to provide the SQL statements.
+
+```java
+package com.grswebservices.peopledb.repository;
+
+import com.grswebservices.peopledb.annotation.MultiSQL;
+import com.grswebservices.peopledb.annotation.SQL;
+import com.grswebservices.peopledb.model.CrudOperation;
+import com.grswebservices.peopledb.model.Person;
+
+import java.math.BigDecimal;
+import java.sql.*;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
+public class PeopleRepository extends CRUDRepository<Person> {
+    public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
+    public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
+    public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
+    public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
+    public static final String DELETE_IN_SQL = "DELETE FROM PEOPLE WHERE ID IN (:ids)";
+    public static final String UPDATE_SQL = "UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=?, SALARY=? WHERE ID=?";
+
+    public PeopleRepository(Connection connection) {
+        super(connection);
+    }
+
+    @Override
+    @SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
+    void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+    }
+
+    @Override
+    @SQL(value = UPDATE_SQL, operationType = CrudOperation.UPDATE)
+    void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+        ps.setBigDecimal(4, entity.getSalary());
+    }
+
+    @Override
+    @SQL(value = FIND_BY_ID_SQL, operationType = CrudOperation.FIND_BY_ID)
+    @SQL(value = FIND_ALL_SQL, operationType = CrudOperation.FIND_ALL)
+    @SQL(value = SELECT_COUNT_SQL, operationType = CrudOperation.COUNT)
+    @SQL(value = DELETE_SQL, operationType = CrudOperation.DELETE_ONE)
+    @SQL(value = DELETE_IN_SQL, operationType = CrudOperation.DELETE_MANY)
+    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
+        long personId = rs.getLong("ID");
+        String firstName = rs.getString("FIRST_NAME");
+        String lastName = rs.getString("LAST_NAME");
+        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
+        BigDecimal salary = rs.getBigDecimal("SALARY");
+        return new Person(personId, firstName, lastName, dob, salary);
+    }
+
+    private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
+        return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());
+    }
+}
+```
+
+```java
+package com.grswebservices.peopledb.repository;
+
+import com.grswebservices.peopledb.annotation.MultiSQL;
+import com.grswebservices.peopledb.annotation.SQL;
+import com.grswebservices.peopledb.exception.UnableToSaveException;
+import com.grswebservices.peopledb.model.CrudOperation;
+import com.grswebservices.peopledb.model.Entity;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+abstract public class CRUDRepository<T extends Entity> {
+
+    // protected so that it can be seen by subclasses like PeopleRepository
+    protected Connection connection;
+
+    public CRUDRepository(Connection connection) {
+        this.connection = connection;
+    }
+
+    public T save(T entity) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.SAVE, this::getSaveSql), PreparedStatement.RETURN_GENERATED_KEYS);
+            mapForSave(entity, ps);
+            int recordsAffected = ps.executeUpdate();
+            ResultSet rs = ps.getGeneratedKeys();
+            while (rs.next()) {
+                long id = rs.getLong(1);
+                entity.setId(id);
+                System.out.println(entity);
+            }
+            System.out.printf("Records affected: %d%n", recordsAffected);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new UnableToSaveException("Tried to save entity: " + entity);
+        }
+        return entity;
+    }
+
+    public Optional<T> findById(Long id) {
+        T entity = null;
+
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.FIND_BY_ID, this::getFindByIdSql));
+            ps.setLong(1, id);
+            ResultSet rs = ps.executeQuery();
+            // telling rs to go to next line or next row
+            while (rs.next()) {
+                entity = extractEntityFromResultSet(rs);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        // if we didn't get any result from rs then the returned entity will be null so Optional.of would blow up - hence has to be Optional.ofNullable
+        return Optional.ofNullable(entity);
+    }
+
+    private List<T> findAll() {
+        List<T> entities = new ArrayList<>();
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.FIND_ALL, this::getFindAllSql));
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                entities.add(extractEntityFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return entities;
+    }
+
+    public long count() {
+        long count = 0;
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.COUNT, this::getCountSql));
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                count = rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return count;
+    }
+
+    public void delete(T entity) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_ONE, this::getDeleteSql));
+            ps.setLong(1, entity.getId());
+            int affectedRecordCount = ps.executeUpdate(); // can pass in sql directly into ps.executeUpdate() however it would not be as beneficial as defining our sql when we create our prepared statement because then that sql has the opportunity to be precompiled.
+            System.out.println(affectedRecordCount);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // var args are basically a shorthand for passing in an array: People...entities = People[] entities - except that we don't have to create an array in the code that calls this method
+    // so it makes it pretty easy to call this method and just pass in any arbitrary number of People objects
+    @SafeVarargs
+    public final void delete(T... entities) {
+        try {
+            Statement stmt = connection.createStatement();
+            String ids = Arrays.stream(entities)
+                    .map(T::getId) // convert stream of entities into a stream of ids
+                    .map(String::valueOf) // convert stream of Long ids into a stream of Text ids - equivalent to String.valueOf(20L)
+                    .collect(Collectors.joining(","));// collect all string ids together and put a comma between them = comma delimited.
+            int affectedRecordCount = stmt.executeUpdate(getSqlByAnnotation(CrudOperation.DELETE_MANY, this::getDeleteInSql).replace(":ids", ids));// (:id)= "sql named parameter" - although h2 doesn't support this so this is a fake or poor man's version
+            System.out.println(affectedRecordCount);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void update(T entity) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.UPDATE, this::getUpdateSql));
+            mapForUpdate(entity, ps);
+            ps.setLong(5, entity.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String getSqlByAnnotation(CrudOperation operationType, Supplier<String> sqlGetter) {
+        Stream<SQL> multiSqlStream = Arrays.stream(this.getClass().getDeclaredMethods())
+                .filter(m -> m.isAnnotationPresent(MultiSQL.class))
+                .map(m -> m.getAnnotation(MultiSQL.class))
+                .flatMap(msql -> Arrays.stream(msql.value()));
+
+        Stream<SQL> sqlStream = Arrays.stream(this.getClass().getDeclaredMethods())
+                .filter(m -> m.isAnnotationPresent(SQL.class))
+                .map(m -> m.getAnnotation(SQL.class));
+
+        return Stream.concat(multiSqlStream, sqlStream)
+                .filter(a -> a.operationType().equals(operationType))
+                .map(SQL::value)
+                .findFirst().orElseGet(sqlGetter);
+    }
+
+    protected String getSaveSql() {throw new RuntimeException("SQL not defined");}
+
+    protected String getCountSql() {throw new RuntimeException("SQL not defined");};
+
+    protected String getFindAllSql() {throw new RuntimeException("SQL not defined");};
+
+    /**
+     * @return Returns a String that represents the SQL needed to retrieve one entity.
+     * The SQL must contain one SQL parameter, i.e. "?", that will bind to the
+     * entity's ID.
+     */
+    protected String getFindByIdSql() {throw new RuntimeException("SQL not defined");};
+
+    protected String getDeleteSql() {throw new RuntimeException("SQL not defined");};
+
+    /**
+     * @return Should return a SQL string like:
+     * "DELETE FROM PEOPLE WHERE ID IN (:ids)"
+     * Be sure to include the '(:ids)' named parameter and call it 'ids'
+     */
+    protected String getDeleteInSql() {throw new RuntimeException("SQL not defined");};
+
+    protected String getUpdateSql() {throw new RuntimeException("SQL not defined");};
+
+    abstract T extractEntityFromResultSet(ResultSet rs) throws SQLException;
+
+    abstract void mapForSave(T entity, PreparedStatement ps) throws SQLException;
+
+    abstract void mapForUpdate(T entity, PreparedStatement ps) throws SQLException;
+}
+
+```
