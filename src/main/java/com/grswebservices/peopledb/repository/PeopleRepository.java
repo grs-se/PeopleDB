@@ -35,39 +35,8 @@ public class PeopleRepository extends CRUDRepository<Person> {
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
     }
 
-    public Optional<Person> findById(Long id) {
-        Person person = null;
-
-        try {
-            PreparedStatement ps = connection.prepareStatement(FIND_BY_ID_SQL);
-            ps.setLong(1, id);
-            ResultSet rs = ps.executeQuery();
-            // telling rs to go to next line or next row
-            while (rs.next()) {
-                person = extractPersonFromResultSet(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-        // if we didn't get any result from rs then the returned person will be null so Optional.of would blow up - hence has to be Optional.ofNullable
-        return Optional.ofNullable(person);
-    }
-
-    private List<Person> findAll() {
-        List<Person> people = new ArrayList<>();
-        try {
-            PreparedStatement ps = connection.prepareStatement(FIND_ALL_SQL);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                people.add(extractPersonFromResultSet(rs));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return people;
-    }
-
-    private static Person extractPersonFromResultSet(ResultSet rs) throws SQLException {
+    @Override
+    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
         // In professional environmental a framework may automatically take care of these String literals to make sure that they are always in sync with whatever is in the database
         long personId = rs.getLong("ID");
         String firstName = rs.getString("FIRST_NAME");
@@ -77,6 +46,25 @@ public class PeopleRepository extends CRUDRepository<Person> {
         ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
         BigDecimal salary = rs.getBigDecimal("SALARY");
         return new Person(personId, firstName, lastName, dob, salary);
+    }
+
+    @Override
+    protected String getFindByIdSql() {
+        return FIND_BY_ID_SQL;
+    }
+
+    private List<Person> findAll() {
+        List<Person> people = new ArrayList<>();
+        try {
+            PreparedStatement ps = connection.prepareStatement(FIND_ALL_SQL);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                people.add(extractEntityFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return people;
     }
 
     public long count() {
