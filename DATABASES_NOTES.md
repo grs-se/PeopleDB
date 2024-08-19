@@ -915,3 +915,38 @@ abstract public class CRUDRepository<T extends Entity> {
 ### CRUD Repository: Custom ID Annotation
 - I want to replace the wya that I am getting this id, currently i am just calling entity.getId(), that works the way you know it would, but i'd rather have some code that would dig into this entity using Relection API, and find the field that is annotated with the new Id annotation, and if it finds one, then this code shoudl get the value that is on that field and return that value. 
 - so we're going to write another annotation finding method that can do the equivalent of what entity.getId() is doing but it will do it via annotation and therefore we will no longer require this class to implement that interface.
+- replace the way that we're getting the id, currently we're using entity.getId9) but rather hsave code that digs into the entity using reflection api and find the field that is annotated with  new idf annotationa nd if it finds one then this code shoudl get the value that is on the field and return that value, so we will no longer require this class to implement the Entity nterface.
+- remember in oop we're dealing with classes and objects - two sides of the same coin. F is a field of the class, but to read a vlaue from that field we have to pass in the object - the class doesnt have the value, the objcet has the value. Class is the blueprint while Object is liek the building. We3 can't store things in a blurpint but we can store things in a building (though static vairables do break this analogy).
+
+```java
+public void delete(T entity) {
+        try {
+            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_ONE, this::getDeleteSql));
+            ps.setLong(1, findIdByAnnotation(entity));
+            int affectedRecordCount = ps.executeUpdate(); // can pass in sql directly into ps.executeUpdate() however it would not be as beneficial as defining our sql when we create our prepared statement because then that sql has the opportunity to be precompiled.
+            System.out.println(affectedRecordCount);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+private Long findIdByAnnotation(T entity) {
+    return Arrays.stream(entity.getClass().getDeclaredFields())
+            .filter(f -> f.isAnnotationPresent(Id.class))
+            .map(f -> {
+                f.setAccessible(true); // tells Java that we want to override the stated level of access on that field
+                Long id = null;
+                try {
+                    id = (long)f.get(entity);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+                return id;
+            })
+            .findFirst().orElseThrow(() -> new RuntimeException(("No ID annotated field found"))); // We should really be creating our own Runtime Exception
+}
+```
+
+- this is how frameworks are actually working. Some of these frameworks have abnnotations exactly like this and they work similarly to this. Differences, our Id annotation is currently only working onthe fielc itself but more robust frameworks would also work if you put the annotation ona  method, ona setter or getter method.
+- could have decided to generise id type to be any type not just long. Anothe rthing we wouldve done is added another type in is added a data type for the id where we specify the entity type pass those both i n - which is what Spring frameworks do.
+- if its a string do this way, if long do this way ...

@@ -1,10 +1,10 @@
 package com.grswebservices.peopledb.repository;
 
+import com.grswebservices.peopledb.annotation.Id;
 import com.grswebservices.peopledb.annotation.MultiSQL;
 import com.grswebservices.peopledb.annotation.SQL;
 import com.grswebservices.peopledb.exception.UnableToSaveException;
 import com.grswebservices.peopledb.model.CrudOperation;
-import com.grswebservices.peopledb.model.Entity;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -15,7 +15,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-abstract public class CRUDRepository<T extends Entity> {
+abstract public class CRUDRepository<T> {
 
     // protected so that it can be seen by subclasses like PeopleRepository
     protected Connection connection;
@@ -32,7 +32,7 @@ abstract public class CRUDRepository<T extends Entity> {
             ResultSet rs = ps.getGeneratedKeys();
             while (rs.next()) {
                 long id = rs.getLong(1);
-                entity.setId(id);
+                setIdByAnnotation(id, entity);
                 System.out.println(entity);
             }
             System.out.printf("Records affected: %d%n", recordsAffected);
@@ -92,12 +92,41 @@ abstract public class CRUDRepository<T extends Entity> {
     public void delete(T entity) {
         try {
             PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_ONE, this::getDeleteSql));
-            ps.setLong(1, entity.getId());
+            ps.setLong(1, getIdByAnnotation(entity));
             int affectedRecordCount = ps.executeUpdate(); // can pass in sql directly into ps.executeUpdate() however it would not be as beneficial as defining our sql when we create our prepared statement because then that sql has the opportunity to be precompiled.
             System.out.println(affectedRecordCount);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void setIdByAnnotation(Long id, T entity) {
+        Arrays.stream(entity.getClass().getDeclaredFields())
+                .filter(f -> f.isAnnotationPresent(Id.class))
+                .forEach(f -> {
+                    f.setAccessible(true);
+                    try {
+                        f.set(entity, id);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Unable to set ID field value.");
+                    }
+                });
+    }
+
+    private Long getIdByAnnotation(T entity) {
+        return Arrays.stream(entity.getClass().getDeclaredFields())
+                .filter(f -> f.isAnnotationPresent(Id.class))
+                .map(f -> {
+                    f.setAccessible(true); // tells Java that we want to override the stated level of access on that field
+                    Long id = null;
+                    try {
+                        id = (long)f.get(entity);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return id;
+                })
+                .findFirst().orElseThrow(() -> new RuntimeException(("No ID annotated field found"))); // We should really be creating our own Runtime Exception
     }
 
     // var args are basically a shorthand for passing in an array: People...entities = People[] entities - except that we don't have to create an array in the code that calls this method
@@ -107,7 +136,7 @@ abstract public class CRUDRepository<T extends Entity> {
         try {
             Statement stmt = connection.createStatement();
             String ids = Arrays.stream(entities)
-                    .map(T::getId) // convert stream of entities into a stream of ids
+                    .map(this::getIdByAnnotation) // convert stream of entities into a stream of ids
                     .map(String::valueOf) // convert stream of Long ids into a stream of Text ids - equivalent to String.valueOf(20L)
                     .collect(Collectors.joining(","));// collect all string ids together and put a comma between them = comma delimited.
             int affectedRecordCount = stmt.executeUpdate(getSqlByAnnotation(CrudOperation.DELETE_MANY, this::getDeleteInSql).replace(":ids", ids));// (:id)= "sql named parameter" - although h2 doesn't support this so this is a fake or poor man's version
@@ -121,7 +150,7 @@ abstract public class CRUDRepository<T extends Entity> {
         try {
             PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.UPDATE, this::getUpdateSql));
             mapForUpdate(entity, ps);
-            ps.setLong(5, entity.getId());
+            ps.setLong(5, getIdByAnnotation(entity));
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
