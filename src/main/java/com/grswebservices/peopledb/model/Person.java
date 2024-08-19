@@ -16,6 +16,15 @@ public class Person {
     private String lastName;
     private ZonedDateTime dob;
     private BigDecimal salary = new BigDecimal("0");
+    private String email;
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
     public Person(long id, String firstName, String lastName, ZonedDateTime dob, BigDecimal salary) {
         this(id, firstName, lastName, dob);
