@@ -122,7 +122,7 @@ public class PeopleRepositoryTests {
     public void loadData() throws IOException, SQLException {
         Files.lines(Path.of("~\\Documents\\Java Course Files\\Big Data\\Hr5m.csv".replace("~", System.getProperty("user.home"))))
                 .skip(1)
-                .limit(100)
+//                .limit(100)
                 .map(l -> l.split(","))
                 .map(a -> {
                     LocalDate dob = LocalDate.parse(a[10], DateTimeFormatter.ofPattern("M/d/yyyy"));

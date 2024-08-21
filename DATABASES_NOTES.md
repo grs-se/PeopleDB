@@ -950,3 +950,41 @@ private Long findIdByAnnotation(T entity) {
 - this is how frameworks are actually working. Some of these frameworks have abnnotations exactly like this and they work similarly to this. Differences, our Id annotation is currently only working onthe fielc itself but more robust frameworks would also work if you put the annotation ona  method, ona setter or getter method.
 - could have decided to generise id type to be any type not just long. Anothe rthing we wouldve done is added another type in is added a data type for the id where we specify the entity type pass those both i n - which is what Spring frameworks do.
 - if its a string do this way, if long do this way ...
+
+----
+
+### Speeding up Queries with Indexes
+- few techniques to vastly improve performance of database
+- 2 seconds to fetch is really quite slow, and if multiple simulatenous users those seconds add up, and keep in mind process is unavailable to do other things for those 2 seconds.
+- db had to scan over every sinlge row checking if id matched what we passed in the parameter, and because we chose a record that#s almost near the very bottom of the tablem the  meaning it had to do a full table scan to find that record
+- how esle could a db find a record without scaninng every row
+- hash, sets, hashmaps - key-value pair - hashmap can analyse key and generate hashcode, hashmap then uses hashcode to determine where in that table he entry should go, so the next time you try to retreive a value out of a hasmap using that key the hasmap doesnt have to iterate over every dingle entry int hat maop instead it takes that key you provided, it regenerates a hashcode for it and then it uses that hashcode to determine an index into a table where your record / entry exists, and then it can much more efficiently go straight to that entry, or at least it can get super close if there happen to be collisions where other entries have the same index, but it can cut down a lot on the amoutn of scanning that has to be done.
+- databases can use very similar kinds of tricks and they are optimized to do so if you help them out. 
+- Databases have the ability to generate what is called an 'index' - creation of idnex on a tbale can be thought of very similarly to a hashmap geneartting hashcodes that lead to indexes for records in a hashmaps internal table. Very similar concepts. Woi;dn't be surpised if a lot of databases used almost an exact same mechanims.
+- key here is if you want to be abkle to look up records more quickly you need to consider using an index for a particular columnthat you#re going to be searching by.
+- when you don't have indexes things are slow.
+- when we create an inde xon a column in a db with 5mill records, the db has to go through the id col values to generate its index, so has to do some analysis.
+
+```java
+SELECT * FROM PEOPLE OFFSET 5000000 FETCH FIRST 1 ROW ONLY; -- skip 5 million records THEN FETCH FIRST 1 ROW ONLY
+SELECT * FROM PEOPLE WHERE ID=5000521; -- 5 seconds BEFORE INDEX, 0.003s AFTER index
+
+CREATE INDEX ID_IDX ON PEOPLE(ID);
+
+```
+
+- our index is specifically for the id column, so if we then try to query by email we will be back to a slow retrieval.
+- some dbs accomodate complex indexes that are based on a combination of columns.
+- if we want query by email to be fast we have to create another index specifically for the email column.
+- indexes are invaluable
+- so why not generate indexes on every single column every database table every time.
+- with great power comes great responsibility.
+- they come at a cost.
+- key to figuring out is asking ourselves in what ways will our db be utilized - in what ways will our users likely to search for and query data.
+- any columns users are likely to specifically search by, or grouping by, or sorting on, any of the sorts of columns where you will do these kind of perations you will generalyl want to have anindex genreated on them.
+- the cost: when you have indexes generated on a column in a table and then you insert records into the table, inserts and updates can take longer now, because every single time you do an insert or update the db will certainly have to do its analysis 
+- if you're working on a project where you know you're going to need to load an enormous number of records, and this is a brand new code and brand new databases, it may be worth considering that it may not be best to not have things like indexes generated on that table initially just so that you can quickly load up that data, you can then always come back later and generate thos eindexes and other optimization objects on the table afterwars.
+- abcs of databases every developer needs to know, many beginners and intermediates get complaints from users that data takes too long to load yet the devs don't even know what an index is.
+- it;s not a lot of effort to implement an index and yet huge performance improvements. 
+- A good example of where a little bit of knowledge can go a really long way.
+- 
