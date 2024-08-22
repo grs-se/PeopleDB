@@ -987,4 +987,70 @@ CREATE INDEX ID_IDX ON PEOPLE(ID);
 - abcs of databases every developer needs to know, many beginners and intermediates get complaints from users that data takes too long to load yet the devs don't even know what an index is.
 - it;s not a lot of effort to implement an index and yet huge performance improvements. 
 - A good example of where a little bit of knowledge can go a really long way.
-- 
+
+---
+### Creating an Address Table
+- first column - usually like to have this column in most tables, though some exceptions - ID col gives us a really efficient and convenient way to refer to any column in a db.
+- - using a column for this purpose, especially an ID column, is often referred to as a surroagte key because it stands in as a represnetative for the overall record.
+- instead of CREATE TABLE PEOPLE (ID BIGINT AUTO_INCREMENT, FIRST_NAME ...)
+- For this addresses table we will do thigns ina more typcial way, using an index on the ID, by generating the index automatically on creation of the table.
+- the id col will usualyl be set up as a primary key field - a very convenient identiifer for records in that table, and if you terll the db that col is the primary key col you usally get a number of features for free, one of those features being an index being generated automatically, another feature being a 'unique constraint', a UC ensures that when we isnert new records into that table the Ids for those records has to be unique among the records, else If records had the same id then harder to sepcify quickly which row you're trying to query for
+- The sql commands for creating and modifying objcet of a datbasse, like Tables, Indexes, Column etc, are called DDL, Data Definition Language.
+- Database 'scripts' are just files of SQL commands that are usually run all at once. They're commonly used ot create tables or load data or both all in one go. You can think of them as datatbase "program"
+- https://h2database.com/html/commands.html#create_table
+- primary keys disallow NULL bvalues because
+- this is everything i wnt to put on the definition of the ID column - feels like alot but when you get used to these thuings it wont.
+
+```sql
+CREATE TABLE ADDRESSES (ID BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY)
+```
+- Now that we have a People Table and an Addresses Table we can establish a relationship between these tables.
+- References specification - new primary address column references the address tables id column
+```SQL
+ALTER TABLE PEOPLE ADD COLUMN PRIMARY_ADDRESS BIGINT REFERENCES ADDRESSES (ID); 
+```
+- Referential integrity - if we choose to specify a value in the PRIMARY_ADDRESS column the database will make sure that value is a legitimate ID of an actual address in the database. The db will also ensure that we cannot accidentally delete an address if that address is being used by a person - it will give us a warning and it actualyl it won't even let us do it. 
+- these are some of the thigns we get for free when we specifuy these relationships.
+- the people tables primary_address column or field has a foreign key pointing to the address tables ID column - so that's a foreign key constraint = can't just willy nilly put any value into the people table's primary_address column, the values that you can put in there are constrained by legitimate ids of the address table.it it
+
+```SQL
+CREATE TABLE PEOPLE(ID BIGINT AUTO_INCREMENT, FIRST_NAME VARCHAR(255), LAST_NAME VARCHAR(255), DOB TIMESTAMP, SALARY DECIMAL);
+
+INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB, SALARY) VALUES('Harry', 'Johnson', '1950-05-15 10:45:10', 1000000.00);
+INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB, SALARY) VALUES('Mary', 'Johnson', '1965-05-12 10:45:10', 30000.00);
+INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB, SALARY) VALUES('Bob', 'Smith', '1956-12-15 10:45:10', 120000.00);
+INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB, SALARY) VALUES('James', 'Johnson', '1972-05-15 10:45:10', 1200000.00);
+INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB, SALARY) VALUES('Timothy', 'Miles', '1987-05-15 10:45:10', 500000.00);
+INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB, SALARY) VALUES('Jane', 'Miles', '1976-05-15 10:45:10', 4000.00);
+
+UPDATE PEOPLE SET ID=6 WHERE ID=10;
+
+SELECT H2VERSION() FROM DUAL;
+
+ALTER TABLE PEOPLE ADD COLUMN EMAIL VARCHAR(255);
+
+SELECT * FROM PEOPLE; -- BE CAREFUL IF DB IS POPULATED WITH 5,000,000 RECORDS
+
+SELECT * FROM PEOPLE FETCH FIRST 100 ROWS ONLY;
+
+SELECT COUNT(*) FROM PEOPLE;
+
+SELECT * FROM PEOPLE OFFSET 5000000 FETCH FIRST 10 ROW ONLY; -- skip 5 million records THEN FETCH FIRST 1 ROW ONLY
+SELECT * FROM PEOPLE WHERE ID=5000521; -- 5 seconds BEFORE INDEX, 0.003s AFTER index
+
+CREATE INDEX ID_IDX ON PEOPLE(ID);
+
+SELECT * FROM PEOPLE WHERE EMAIL='willa.washer@gmail.com'; -- 6 seconds BEFORE INDEX, 0.002s AFTER INDEX.
+
+CREATE INDEX EMAIL_IDX ON PEOPLE(EMAIL);
+
+CREATE TABLE ADDRESSES (ID BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, STREET_ADDRESS VARCHAR(255), ADDRESS2 VARCHAR(255), CITY VARCHAR(255), STATE VARCHAR(2), POSTCODE VARCHAR(255), COUNTY VARCHAR(255), REGION VARCHAR(255), COUNTRY VARCHAR(100));
+
+SELECT * FROM ADDRESSES;
+
+SELECT * FROM PEOPLE FETCH FIRST 10 ROWS ONLY;
+
+ALTER TABLE PEOPLE ADD COLUMN PRIMARY_ADDRESS BIGINT REFERENCES ADDRESSES (ID);
+
+UPDATE PEOPLE SET PRIMARY_ADDRESS=1000 WHERE ID=1; -- referential integrity CONSTRAINT violation - 
+```
