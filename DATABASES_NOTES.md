@@ -1054,3 +1054,41 @@ ALTER TABLE PEOPLE ADD COLUMN PRIMARY_ADDRESS BIGINT REFERENCES ADDRESSES (ID);
 
 UPDATE PEOPLE SET PRIMARY_ADDRESS=1000 WHERE ID=1; -- referential integrity CONSTRAINT violation - 
 ```
+
+---
+
+### Saving One Address
+- TDD like working backwards
+- a persons primary address field of the person table will contain the id field of an address in the address table.
+- that means we will need to save an address to the database and get its generated id before we save a person.
+- so if there is an address on a person instance we will need to save that address first then we should hopefully be able to get the id of that address and then associate that addresses id with another field.
+- we could create an instance od the address repo inside the person repo and set it in the constructor. We absolutely can do this but there is a bit of a philosophical problem with doing this becuase you'll never hear the end of this iin the Java development world. 
+- If we do this in live production code we are very tightly coupling these two repository classes, we're intrisically linking these two classes, now in real life they need to be linked,
+
+```java
+public PersonRepository(Connection connection) {
+    super(connection);
+    addressRepository = new AddressRepository(connection);
+
+}
+
+@Override
+@SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
+void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+  Address savedAddress = addressRepository.save(entity.getHomeAddress()); // need to save address first
+  ps.setString(1, entity.getFirstName());
+  ps.setString(2, entity.getLastName());
+  ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+  ps.setBigDecimal(4, entity.getSalary());
+  ps.setString(5, entity.getEmail());
+  ps.setLong(6, savedAddress.id());
+}
+```
+
+```SQL
+ALTER TABLE PEOPLE ALTER COLUMN PRIMARY_ADDRESS RENAME TO HOME_ADDRESS;
+
+SELECT * FROM ADDRESSES;
+
+SELECT * FROM PEOPLE WHERE HOME_ADDRESS = 6;
+```

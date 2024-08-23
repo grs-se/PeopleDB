@@ -1,7 +1,7 @@
 package com.grswebservices.peopledb.repository;
 
-import com.grswebservices.peopledb.annotation.MultiSQL;
 import com.grswebservices.peopledb.annotation.SQL;
+import com.grswebservices.peopledb.model.Address;
 import com.grswebservices.peopledb.model.CrudOperation;
 import com.grswebservices.peopledb.model.Person;
 
@@ -10,11 +10,12 @@ import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-public class PeopleRepository extends CRUDRepository<Person> {
+public class PersonRepository extends CRUDRepository<Person> {
+    private AddressRepository addressRepository = null;
     public static final String SAVE_PERSON_SQL = """
             INSERT INTO PEOPLE
-            (FIRST_NAME, LAST_NAME, DOB, SALARY, EMAIL)
-            VALUES(?, ?, ?, ?, ?)""";
+            (FIRST_NAME, LAST_NAME, DOB, SALARY, EMAIL, HOME_ADDRESS)
+            VALUES(?, ?, ?, ?, ?, ?)""";
     public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
     public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
     public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
@@ -22,18 +23,22 @@ public class PeopleRepository extends CRUDRepository<Person> {
     public static final String DELETE_IN_SQL = "DELETE FROM PEOPLE WHERE ID IN (:ids)";
     public static final String UPDATE_SQL = "UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=?, SALARY=? WHERE ID=?";
 
-    public PeopleRepository(Connection connection) {
+    public PersonRepository(Connection connection) {
         super(connection);
+        addressRepository = new AddressRepository(connection);
+
     }
 
     @Override
     @SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        Address savedAddress = addressRepository.save(entity.getHomeAddress()); // need to save address first
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
         ps.setBigDecimal(4, entity.getSalary());
         ps.setString(5, entity.getEmail());
+        ps.setLong(6, savedAddress.id());
     }
 
     @Override

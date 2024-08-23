@@ -1,8 +1,11 @@
 package com.grswebservices.peopledb.repository;
 
+import com.grswebservices.peopledb.model.Address;
 import com.grswebservices.peopledb.model.Person;
+import com.grswebservices.peopledb.model.Region;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -23,17 +26,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // Need the tests to fail before we implement anything, otherwise we can't be sure that we've actually implemented the needed functionality
 // main thing is make sure you have a failing test before you implement any code, then you run the test again, hopefully it passes, then you can mostly trust that you're probably on the right path.
-public class PeopleRepositoryTests {
+public class PersonRepositoryTests {
 
     private Connection connection;
-    private PeopleRepository repo;
+    private PersonRepository repo;
 
     @BeforeEach
     void setUp() throws SQLException {
         connection = DriverManager.getConnection("jdbc:h2:~\\Documents\\Database\\DBeaver\\peopletestdb".replace("~", System.getProperty("user.home")));
         // we can run tests without additional records showing up in database - or at least they are wiped out afterwards
         connection.setAutoCommit(false);
-        repo = new PeopleRepository(connection);
+        repo = new PersonRepository(connection);
     }
 
     @AfterEach
@@ -57,6 +60,17 @@ public class PeopleRepositoryTests {
         Person savedPerson1 = repo.save(john);
         Person savedPerson2 = repo.save(bobby);
         assertThat(savedPerson1.getId()).isNotEqualTo(savedPerson2.getId());
+    }
+
+    @Test
+    public void canSavePersonWithAddress() throws SQLException {
+        Person john = new Person("JohnZZZ", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6")));
+        Address address = new Address(null,"123 Beale St.", "Apt. 1A", "Wala Wala", "WA", "90210", "Fulton County", Region.WEST, "United States");
+        john.setHomeAddress(address);
+
+        Person savedPerson = repo.save(john);
+        assertThat(savedPerson.getHomeAddress().id()).isGreaterThan(0);
+        connection.commit();
     }
 
     @Test
@@ -119,6 +133,8 @@ public class PeopleRepositoryTests {
     }
 
     @Test
+    @Disabled
+    // CAREFUL - DO NOT RUN THIS MORE THAN ONCE
     public void loadData() throws IOException, SQLException {
         Files.lines(Path.of("~\\Documents\\Java Course Files\\Big Data\\Hr5m.csv".replace("~", System.getProperty("user.home"))))
                 .skip(1)
@@ -137,8 +153,6 @@ public class PeopleRepositoryTests {
                 .forEach(repo::save);
         connection.commit(); // in this test case we want to commit data to db
     }
-
-
 
     ////////////////////////////////////////////
     // EXPERIMENTS

@@ -17,6 +17,7 @@ public class Person {
     private ZonedDateTime dob;
     private BigDecimal salary = new BigDecimal("0");
     private String email;
+    private Address homeAddress;
 
     public String getEmail() {
         return email;
@@ -107,5 +108,13 @@ public class Person {
 
     public void setSalary(BigDecimal salary) {
         this.salary = salary;
+    }
+
+    public void setHomeAddress(Address homeAddress) {
+        this.homeAddress = homeAddress;
+    }
+
+    public Address getHomeAddress() {
+        return homeAddress;
     }
 }
