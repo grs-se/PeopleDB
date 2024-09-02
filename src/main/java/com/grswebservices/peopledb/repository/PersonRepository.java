@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Optional;
 
 public class PersonRepository extends CRUDRepository<Person> {
     private AddressRepository addressRepository = null;
@@ -32,13 +33,18 @@ public class PersonRepository extends CRUDRepository<Person> {
     @Override
     @SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
-        Address savedAddress = addressRepository.save(entity.getHomeAddress()); // need to save address first
+        Address savedAddress = null; // need to save address first
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
         ps.setBigDecimal(4, entity.getSalary());
         ps.setString(5, entity.getEmail());
-        ps.setLong(6, savedAddress.id());
+        if (entity.getHomeAddress().isPresent()) {
+            savedAddress = addressRepository.save(entity.getHomeAddress().get());
+            ps.setLong(6, savedAddress.id());
+        } else {
+            ps.setObject(6, null);
+        }
     }
 
     @Override

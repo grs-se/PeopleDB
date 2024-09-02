@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import java.util.Optional;
 
 public class Person {
     @Id
@@ -17,7 +18,7 @@ public class Person {
     private ZonedDateTime dob;
     private BigDecimal salary = new BigDecimal("0");
     private String email;
-    private Address homeAddress;
+    private Optional<Address> homeAddress = Optional.empty();
 
     public String getEmail() {
         return email;
@@ -111,10 +112,10 @@ public class Person {
     }
 
     public void setHomeAddress(Address homeAddress) {
-        this.homeAddress = homeAddress;
+        this.homeAddress = Optional.ofNullable(homeAddress);
     }
 
-    public Address getHomeAddress() {
+    public Optional<Address> getHomeAddress() {
         return homeAddress;
     }
 }

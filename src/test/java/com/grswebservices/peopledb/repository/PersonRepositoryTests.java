@@ -65,11 +65,11 @@ public class PersonRepositoryTests {
     @Test
     public void canSavePersonWithAddress() throws SQLException {
         Person john = new Person("JohnZZZ", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6")));
-        Address address = new Address(null,"123 Beale St.", "Apt. 1A", "Wala Wala", "WA", "90210", "Fulton County", Region.WEST, "United States");
+        Address address = new Address(null, "123 Beale St.", "Apt. 1A", "Wala Wala", "WA", "90210", "Fulton County", Region.WEST, "United States");
         john.setHomeAddress(address);
 
         Person savedPerson = repo.save(john);
-        assertThat(savedPerson.getHomeAddress().id()).isGreaterThan(0);
+        assertThat(savedPerson.getHomeAddress().get().id()).isGreaterThan(0);
         connection.commit();
     }
 
