@@ -70,7 +70,6 @@ public class PersonRepositoryTests {
 
         Person savedPerson = repo.save(john);
         assertThat(savedPerson.getHomeAddress().get().id()).isGreaterThan(0);
-        connection.commit();
     }
 
     @Test
@@ -80,6 +79,17 @@ public class PersonRepositoryTests {
         Person foundPerson = repo.findById(savedPerson.getId()).get();
         // equals() method = all properties (id, name, dob, ...) of entities compared have to be equal
         assertThat(foundPerson).isEqualTo(savedPerson);
+    }
+
+    @Test
+    public void canFindPersonByIdWithAddress() throws SQLException {
+        Person john = new Person("JohnZZZ", "Smith", ZonedDateTime.of(1980, 11, 15, 15, 15, 0, 0, ZoneId.of("-6")));
+        Address address = new Address(null, "123 Beale St.", "Apt. 1A", "Wala Wala", "WA", "90210", "Fulton County", Region.WEST, "United States");
+        john.setHomeAddress(address);
+
+        Person savedPerson = repo.save(john);
+        Person foundPerson = repo.findById(savedPerson.getId()).get();
+        assertThat(foundPerson.getHomeAddress().get().state()).isEqualTo("WA");
     }
 
     @Test

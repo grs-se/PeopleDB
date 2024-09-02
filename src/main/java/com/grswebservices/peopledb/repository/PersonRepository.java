@@ -17,7 +17,7 @@ public class PersonRepository extends CRUDRepository<Person> {
             INSERT INTO PEOPLE
             (FIRST_NAME, LAST_NAME, DOB, SALARY, EMAIL, HOME_ADDRESS)
             VALUES(?, ?, ?, ?, ?, ?)""";
-    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY, HOME_ADDRESS FROM PEOPLE WHERE ID=?";
     public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
     public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
     public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
@@ -68,7 +68,11 @@ public class PersonRepository extends CRUDRepository<Person> {
         String lastName = rs.getString("LAST_NAME");
         ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
         BigDecimal salary = rs.getBigDecimal("SALARY");
-        return new Person(personId, firstName, lastName, dob, salary);
+        long homeAddressId = rs.getLong("HOME_ADDRESS");
+        Optional<Address> homeAddress = addressRepository.findById(homeAddressId);
+        Person person = new Person(personId, firstName, lastName, dob, salary);
+        person.setHomeAddress(homeAddress.orElse(null));
+        return person;
     }
 
     private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
