@@ -33,7 +33,7 @@ public class PersonRepositoryTests {
 
     @BeforeEach
     void setUp() throws SQLException {
-        connection = DriverManager.getConnection("jdbc:h2:~\\Documents\\Database\\DBeaver\\peopletestdb".replace("~", System.getProperty("user.home")));
+        connection = DriverManager.getConnection("jdbc:h2:~\\Documents\\Database\\DBeaver\\peopletestdb;".replace("~", System.getProperty("user.home")));
         // we can run tests without additional records showing up in database - or at least they are wiped out afterwards
         connection.setAutoCommit(false);
         repo = new PersonRepository(connection);

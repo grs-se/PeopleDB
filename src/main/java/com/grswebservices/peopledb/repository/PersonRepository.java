@@ -21,10 +21,10 @@ public class PersonRepository extends CRUDRepository<Person> {
     public static final String FIND_BY_ID_SQL = """
             SELECT
             P.ID, P.FIRST_NAME, P.LAST_NAME, P.DOB, P.SALARY, P.HOME_ADDRESS,
-            A.ID, A.STREET_ADDRESS, A.ADDRESS2, A.CITY, A.STATE, A.POSTCODE, A.COUNTY, A.REGION, A.COUNTRY
+            A.ID AS A_ID, A.STREET_ADDRESS, A.ADDRESS2, A.CITY, A.STATE, A.POSTCODE, A.COUNTY, A.REGION, A.COUNTRY
             FROM PEOPLE AS P
             LEFT OUTER JOIN ADDRESSES AS A ON P.HOME_ADDRESS = A.ID
-            WHERE P.ID=?""";
+            WHERE P.ID=?"""; // In real life every single column should have an alias in order to prevent naming conflicts, but frameworks take care of this automatically.
     public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
     public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
     public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
@@ -71,6 +71,7 @@ public class PersonRepository extends CRUDRepository<Person> {
     @SQL(value = DELETE_IN_SQL, operationType = CrudOperation.DELETE_MANY)
     Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
         long personId = rs.getLong("ID");
+//        rs.getMetaData().getColumnLabel(1); // access alias
         String firstName = rs.getString("FIRST_NAME");
         String lastName = rs.getString("LAST_NAME");
         ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
@@ -83,8 +84,11 @@ public class PersonRepository extends CRUDRepository<Person> {
         return person;
     }
 
-    private static Address extractAddress(ResultSet rs) throws SQLException {
-        long addrId = rs.getLong("ID");
+    private Address extractAddress(ResultSet rs) throws SQLException {
+        Long addrId = getValueByAlias("A_ID", rs, Long.class);
+        if (addrId == null) return null;
+//        long addrId = rs.getLong("A_ID");
+        String streetAddress2 = getValueByAlias("STREET_ADDRESS", rs, String.class);
         String streetAddress = rs.getString("STREET_ADDRESS");
         String address2 = rs.getString("ADDRESS2");
         String city = rs.getString("CITY");
@@ -95,6 +99,16 @@ public class PersonRepository extends CRUDRepository<Person> {
         String country = rs.getString("COUNTRY");
         Address address = new Address(addrId, streetAddress, address2, city, state, postcode, county, region, country);
         return address;
+    }
+
+    private <T> T getValueByAlias(String alias, ResultSet rs, Class<T> clazz) throws SQLException {
+        int columnCount = rs.getMetaData().getColumnCount();
+        for (int colIdx=1; colIdx<=columnCount; colIdx++) {
+            if (alias.equals(rs.getMetaData().getColumnLabel(colIdx))) {
+                return (T) rs.getObject(colIdx);
+            }
+        }
+        throw new SQLException(String.format("Column not found for alias: '%s'", alias));
     }
 
     private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
